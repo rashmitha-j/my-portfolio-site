@@ -1,43 +1,202 @@
 import { useEffect, useRef, useState } from "react";
+import {
+  AnimatePresence,
+  LazyMotion,
+  MotionConfig,
+  cubicBezier,
+  domAnimation,
+  m,
+  useMotionValue,
+  useReducedMotion,
+  useSpring,
+} from "framer-motion";
 import { profile, contact, projects, about, skills, achievements, nav } from "./data.js";
 
-// Fades children in the first time they scroll into view
-function Reveal({ as: Tag = "div", className = "", delay = 0, children, ...rest }) {
-  const ref = useRef(null);
-  const [shown, setShown] = useState(false);
+const EASE = [0.22, 1, 0.36, 1];
+const easeFn = cubicBezier(...EASE);
+const NAV_OFFSET = 80; // matches scroll-padding-top in styles.css
+const INTRO_KEY = "intro-seen";
 
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || !("IntersectionObserver" in window)) {
-      setShown(true);
-      return;
-    }
-    let timer;
-    // Stagger with a timeout rather than transition-delay so hover effects stay instant
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          timer = setTimeout(() => setShown(true), delay);
-          io.disconnect();
-        }
-      },
-      { threshold: 0.12 }
-    );
-    io.observe(el);
-    return () => {
-      io.disconnect();
-      clearTimeout(timer);
-    };
-  }, [delay]);
-
+// Fades children up the first time they scroll into view. `delay` is in seconds.
+// Hover lifts use the CSS `translate` property so they don't fight Framer's inline transform.
+function Reveal({ as = "div", delay = 0, children, ...rest }) {
+  const reduce = useReducedMotion();
+  const Tag = m[as];
   return (
     <Tag
-      ref={ref}
-      className={`reveal ${shown ? "is-visible" : ""} ${className}`}
+      initial={reduce ? false : { opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.15 }}
+      transition={{ duration: 0.8, ease: EASE, delay }}
       {...rest}
     >
       {children}
     </Tag>
+  );
+}
+
+function shouldShowIntro() {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return false;
+  try {
+    return sessionStorage.getItem(INTRO_KEY) !== "1";
+  } catch (e) {
+    return true;
+  }
+}
+
+// Full-screen "RJ" card shown on the first visit of a session, then slides up to reveal the page
+function Intro({ show }) {
+  return (
+    <AnimatePresence>
+      {show && (
+        <m.div
+          key="intro"
+          className="intro"
+          aria-hidden="true"
+          exit={{ y: "-100%" }}
+          transition={{ duration: 0.8, ease: EASE }}
+        >
+          <div className="intro-mark">
+            {[...profile.initials].map((ch, i) => (
+              <span key={i} className="mask">
+                <m.span
+                  initial={{ y: "110%" }}
+                  animate={{ y: 0 }}
+                  transition={{ duration: 0.7, ease: EASE, delay: 0.1 + i * 0.08 }}
+                >
+                  {ch}
+                </m.span>
+              </span>
+            ))}
+          </div>
+          <m.span
+            className="intro-name"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: EASE, delay: 0.35 }}
+          >
+            {profile.name}
+          </m.span>
+        </m.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function useScrolled(threshold = 8) {
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > threshold);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [threshold]);
+  return scrolled;
+}
+
+// Tweens window scroll position; returns a function that cancels it
+function scrollWindowTo(from, to, duration) {
+  let frame;
+  const start = performance.now();
+  const step = (now) => {
+    const t = Math.min(1, (now - start) / (duration * 1000));
+    window.scrollTo(0, from + (to - from) * easeFn(t));
+    if (t < 1) frame = requestAnimationFrame(step);
+  };
+  frame = requestAnimationFrame(step);
+  return () => cancelAnimationFrame(frame);
+}
+
+// Eased scrolling for in-page links (navbar, hero buttons, footer)
+function useSmoothAnchors() {
+  const reduce = useReducedMotion();
+  useEffect(() => {
+    let cancel;
+    const stop = () => cancel?.();
+
+    function onClick(e) {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const link = e.target.closest('a[href^="#"]');
+      const id = link?.getAttribute("href").slice(1);
+      const target = id && document.getElementById(id);
+      if (!target) return;
+      e.preventDefault();
+
+      const from = window.scrollY;
+      const to = Math.max(0, target.getBoundingClientRect().top + from - NAV_OFFSET);
+      history.pushState(null, "", `#${id}`);
+      stop();
+      if (reduce) {
+        window.scrollTo(0, to);
+      } else {
+        cancel = scrollWindowTo(from, to, Math.min(1.2, 0.6 + Math.abs(to - from) / 4000));
+      }
+      // Move focus for keyboard and screen-reader users without jumping the scroll
+      target.setAttribute("tabindex", "-1");
+      target.focus({ preventScroll: true });
+    }
+
+    document.addEventListener("click", onClick);
+    // Let the user take over mid-scroll
+    window.addEventListener("wheel", stop, { passive: true });
+    window.addEventListener("touchstart", stop, { passive: true });
+    window.addEventListener("keydown", stop);
+    return () => {
+      stop();
+      document.removeEventListener("click", onClick);
+      window.removeEventListener("wheel", stop);
+      window.removeEventListener("touchstart", stop);
+      window.removeEventListener("keydown", stop);
+    };
+  }, [reduce]);
+}
+
+// Small dot that trails the pointer and grows over links and buttons (mouse users only)
+function CursorDot() {
+  const [enabled, setEnabled] = useState(false);
+  const [hovering, setHovering] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const x = useMotionValue(-100);
+  const y = useMotionValue(-100);
+  const sx = useSpring(x, { stiffness: 600, damping: 40, mass: 0.4 });
+  const sy = useSpring(y, { stiffness: 600, damping: 40, mass: 0.4 });
+
+  useEffect(() => {
+    const mq = window.matchMedia("(hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)");
+    const update = () => setEnabled(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const move = (e) => {
+      x.set(e.clientX);
+      y.set(e.clientY);
+      setVisible(true);
+    };
+    const over = (e) => setHovering(!!e.target.closest?.("a, button"));
+    const leave = () => setVisible(false);
+    window.addEventListener("pointermove", move, { passive: true });
+    document.addEventListener("pointerover", over);
+    document.documentElement.addEventListener("pointerleave", leave);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerover", over);
+      document.documentElement.removeEventListener("pointerleave", leave);
+    };
+  }, [enabled, x, y]);
+
+  if (!enabled) return null;
+  return (
+    <m.div
+      className="cursor-dot"
+      aria-hidden="true"
+      style={{ x: sx, y: sy }}
+      animate={{ scale: hovering ? 4 : 1, opacity: visible ? (hovering ? 0.22 : 0.9) : 0 }}
+      transition={{ duration: 0.35, ease: EASE }}
+    />
   );
 }
 
@@ -85,9 +244,16 @@ function ThemeToggle() {
   );
 }
 
-function Navbar() {
+function Navbar({ ready }) {
+  const reduce = useReducedMotion();
+  const scrolled = useScrolled();
   return (
-    <header className="navbar">
+    <m.header
+      className={`navbar ${scrolled ? "is-scrolled" : ""}`}
+      initial={reduce ? false : { y: "-100%" }}
+      animate={{ y: ready ? 0 : "-100%" }}
+      transition={{ duration: 0.8, ease: EASE, delay: 0.1 }}
+    >
       <div className="container navbar-inner">
         <a href="#top" className="brand">
           {profile.name}
@@ -101,7 +267,7 @@ function Navbar() {
           <ThemeToggle />
         </nav>
       </div>
-    </header>
+    </m.header>
   );
 }
 
@@ -126,26 +292,77 @@ function Avatar() {
   );
 }
 
-function Hero() {
+const fadeUp = {
+  hidden: { opacity: 0, y: 24 },
+  show: (delay) => ({ opacity: 1, y: 0, transition: { duration: 0.8, ease: EASE, delay } }),
+};
+
+const letterUp = {
+  hidden: { y: "110%" },
+  show: (delay) => ({ y: 0, transition: { duration: 0.8, ease: EASE, delay } }),
+};
+
+const photoIn = {
+  hidden: { opacity: 0, scale: 0.9 },
+  show: (delay) => ({ opacity: 1, scale: 1, transition: { duration: 0.9, ease: EASE, delay } }),
+};
+
+// Entrance order: eyebrow → name letter by letter → tagline → buttons → photo
+function Hero({ ready }) {
+  const reduce = useReducedMotion();
+  const motionProps = (variants, delay) => ({
+    variants,
+    custom: delay,
+    initial: reduce ? false : "hidden",
+    animate: ready ? "show" : "hidden",
+  });
+
+  const name = profile.name.toUpperCase();
+  const words = name.split(" ");
+  const LETTERS_START = 0.2;
+  const LETTER_STAGGER = 0.035;
+  let letterIndex = 0;
+
   return (
     <section id="top" className="hero">
       <div className="container hero-inner">
-        <Reveal className="hero-text">
-          <p className="eyebrow">Hi, I'm</p>
-          <h1 className="hero-name">{profile.name.toUpperCase()}</h1>
-          <p className="hero-tagline">{profile.tagline}</p>
-          <div className="btn-row">
+        <div className="hero-text">
+          <m.p className="eyebrow" {...motionProps(fadeUp, 0.1)}>
+            Hi, I'm
+          </m.p>
+          <h1 className="hero-name" aria-label={name}>
+            {words.map((word, wi) => (
+              <span key={wi}>
+                <span className="word-mask" aria-hidden="true">
+                  {[...word].map((ch, ci) => (
+                    <m.span
+                      key={ci}
+                      className="letter"
+                      {...motionProps(letterUp, LETTERS_START + letterIndex++ * LETTER_STAGGER)}
+                    >
+                      {ch}
+                    </m.span>
+                  ))}
+                </span>
+                {wi < words.length - 1 && " "}
+              </span>
+            ))}
+          </h1>
+          <m.p className="hero-tagline" {...motionProps(fadeUp, 0.65)}>
+            {profile.tagline}
+          </m.p>
+          <m.div className="btn-row" {...motionProps(fadeUp, 0.8)}>
             <a href="#work" className="btn btn-primary">
               View my work
             </a>
             <a href="#contact" className="btn btn-secondary">
               Contact me
             </a>
-          </div>
-        </Reveal>
-        <Reveal className="hero-photo" delay={120}>
+          </m.div>
+        </div>
+        <m.div className="hero-photo" {...motionProps(photoIn, 0.95)}>
           <Avatar />
-        </Reveal>
+        </m.div>
       </div>
     </section>
   );
@@ -189,7 +406,7 @@ function Work() {
 
         <div className="projects">
           {projects.map((project, i) => (
-            <Reveal as="article" key={project.name} className="card project-card" delay={i * 80}>
+            <Reveal as="article" key={project.name} className="card project-card" delay={i * 0.1}>
               <div className="project-media">
                 <ProjectImage project={project} />
               </div>
@@ -206,7 +423,10 @@ function Work() {
                     GitHub <ArrowIcon />
                   </a>
                   <a href={project.demo} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-sm">
-                    Live Demo <ArrowIcon />
+                    Live Demo
+                    <span className="demo-arrow">
+                      <ArrowIcon />
+                    </span>
                   </a>
                 </div>
               </div>
@@ -235,15 +455,15 @@ function About() {
               <p key={i}>{p}</p>
             ))}
           </Reveal>
-          <Reveal className="facts" delay={100}>
-            {about.facts.map((fact) => (
-              <div key={fact.label} className="card fact">
+          <div className="facts">
+            {about.facts.map((fact, i) => (
+              <Reveal key={fact.label} className="card fact" delay={0.1 + i * 0.08}>
                 <span className="fact-label">{fact.label}</span>
                 <strong>{fact.value}</strong>
                 <span className="fact-detail">{fact.detail}</span>
-              </div>
+              </Reveal>
             ))}
-          </Reveal>
+          </div>
         </div>
 
         <Reveal as="h3" className="sub-head">
@@ -251,7 +471,7 @@ function About() {
         </Reveal>
         <div className="skills-grid">
           {skills.map((group, i) => (
-            <Reveal key={group.group} className="card skill-card" delay={i * 60}>
+            <Reveal key={group.group} className="card skill-card" delay={i * 0.08}>
               <h4>{group.group}</h4>
               <ul className="tags">
                 {group.items.map((item) => (
@@ -267,7 +487,7 @@ function About() {
         </Reveal>
         <div className="achievements">
           {achievements.map((a, i) => (
-            <Reveal key={a.title} className="card achievement" delay={i * 60}>
+            <Reveal key={a.title} className="card achievement" delay={i * 0.08}>
               <span className="achievement-stat">{a.stat}</span>
               <h4>{a.title}</h4>
               <p>{a.detail}</p>
@@ -307,7 +527,7 @@ function Contact() {
               key={item.label}
               href={item.href}
               className="card contact-item"
-              delay={i * 50}
+              delay={i * 0.06}
               {...(item.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
             >
               <span className="contact-label">{item.label}</span>
@@ -341,16 +561,43 @@ function Footer() {
 }
 
 export default function App() {
+  const [showIntro, setShowIntro] = useState(shouldShowIntro);
+  const [ready, setReady] = useState(!showIntro);
+  useSmoothAnchors();
+
+  useEffect(() => {
+    if (!showIntro) return;
+    try {
+      sessionStorage.setItem(INTRO_KEY, "1");
+    } catch (e) {}
+    const root = document.documentElement;
+    root.style.overflow = "hidden";
+    // Start the page entrance as the intro begins sliding away so the two overlap
+    const timer = setTimeout(() => {
+      setShowIntro(false);
+      setReady(true);
+      root.style.overflow = "";
+    }, 1200);
+    return () => {
+      clearTimeout(timer);
+      root.style.overflow = "";
+    };
+  }, [showIntro]);
+
   return (
-    <>
-      <Navbar />
-      <main>
-        <Hero />
-        <Work />
-        <About />
-        <Contact />
-      </main>
-      <Footer />
-    </>
+    <LazyMotion features={domAnimation} strict>
+      <MotionConfig reducedMotion="user">
+        <Intro show={showIntro} />
+        <CursorDot />
+        <Navbar ready={ready} />
+        <main>
+          <Hero ready={ready} />
+          <Work />
+          <About />
+          <Contact />
+        </main>
+        <Footer />
+      </MotionConfig>
+    </LazyMotion>
   );
 }

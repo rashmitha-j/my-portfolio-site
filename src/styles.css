@@ -15,6 +15,7 @@
   --nav-bg: rgba(255, 255, 255, 0.82);
   --radius: 18px;
   --maxw: 1120px;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
   color-scheme: light;
 }
 
@@ -62,8 +63,8 @@
 }
 
 html {
-  scroll-behavior: smooth;
   scroll-padding-top: 80px;
+  scrollbar-gutter: stable;
 }
 
 body {
@@ -112,6 +113,11 @@ ul {
   border-radius: 6px;
 }
 
+/* Sections receive focus after an in-page link jump; don't outline the whole section */
+[tabindex="-1"]:focus {
+  outline: none;
+}
+
 ::selection {
   background: var(--accent);
   color: var(--on-accent);
@@ -135,12 +141,17 @@ ul {
   font-weight: 600;
   font-size: 15px;
   border: 1px solid transparent;
-  transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.3s var(--ease);
   white-space: nowrap;
 }
 
 .btn:hover {
   transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(0) scale(0.96);
+  transition-duration: 0.1s;
 }
 
 .btn-primary {
@@ -186,7 +197,7 @@ ul {
   background: var(--surface);
   color: var(--text);
   cursor: pointer;
-  transition: border-color 0.2s, color 0.2s;
+  transition: border-color 0.2s, color 0.2s, transform 0.3s var(--ease);
 }
 
 .icon-btn:hover {
@@ -194,15 +205,28 @@ ul {
   color: var(--accent);
 }
 
+.icon-btn:active {
+  transform: scale(0.92);
+  transition-duration: 0.1s;
+}
+
 /* ---------- Navbar ---------- */
+/* Transparent at the top of the page, frosted glass once scrolled */
 .navbar {
   position: sticky;
   top: 0;
   z-index: 50;
+  background: transparent;
+  border-bottom: 1px solid transparent;
+  transition: background-color 0.4s var(--ease), border-color 0.4s var(--ease),
+    backdrop-filter 0.4s var(--ease);
+}
+
+.navbar.is-scrolled {
   background: var(--nav-bg);
   backdrop-filter: saturate(180%) blur(12px);
   -webkit-backdrop-filter: saturate(180%) blur(12px);
-  border-bottom: 1px solid var(--border);
+  border-bottom-color: var(--border);
 }
 
 .navbar-inner {
@@ -264,6 +288,20 @@ ul {
   font-weight: 800;
   letter-spacing: -0.045em;
   line-height: 0.95;
+}
+
+/* Each word clips its letters so they slide up from behind a mask.
+   Padding with matching negative margin stops glyph edges being clipped. */
+.word-mask {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: top;
+  padding: 0 0.06em 0.1em;
+  margin: 0 -0.06em -0.1em;
+}
+
+.letter {
+  display: inline-block;
 }
 
 .hero-tagline {
@@ -338,13 +376,18 @@ ul {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease,
-    opacity 0.7s ease;
+  /* No `transform` here: Framer animates it inline for scroll reveals */
+  transition: translate 0.5s var(--ease), box-shadow 0.5s var(--ease), border-color 0.25s ease;
 }
 
-.card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-hover);
+@media (hover: hover) {
+  .card:hover {
+    translate: 0 -4px;
+    box-shadow: var(--shadow-hover);
+  }
+  .project-card:hover {
+    translate: 0 -6px;
+  }
 }
 
 .tags {
@@ -387,6 +430,47 @@ ul {
   height: 100%;
   object-fit: cover;
   object-position: top;
+  transition: transform 0.9s var(--ease);
+}
+
+@media (hover: hover) {
+  .project-card:hover .project-media img,
+  .project-card:hover .project-placeholder {
+    transform: scale(1.05);
+  }
+}
+
+/* Arrow next to "Live Demo" slides in on card hover; always shown on touch screens */
+.demo-arrow {
+  display: inline-flex;
+  width: 0;
+  margin-left: -8px;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: width 0.5s var(--ease), margin-left 0.5s var(--ease), opacity 0.4s var(--ease),
+    transform 0.5s var(--ease);
+}
+
+.demo-arrow svg {
+  flex-shrink: 0;
+}
+
+.project-card:hover .demo-arrow,
+.project-card:focus-within .demo-arrow {
+  width: 14px;
+  margin-left: 0;
+  opacity: 1;
+  transform: none;
+}
+
+@media (hover: none) {
+  .demo-arrow {
+    width: 14px;
+    margin-left: 0;
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .project-placeholder {
@@ -402,6 +486,7 @@ ul {
   font-weight: 800;
   letter-spacing: -0.03em;
   text-align: center;
+  transition: transform 0.9s var(--ease);
 }
 
 .project-card:nth-child(2) .project-placeholder {
@@ -615,20 +700,58 @@ ul {
   color: var(--text-muted);
 }
 
-/* ---------- Scroll reveal ---------- */
-.reveal {
+/* ---------- Intro ---------- */
+.intro {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.intro-mark {
+  display: flex;
+  font-size: clamp(72px, 14vw, 132px);
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  line-height: 1;
+}
+
+.intro-mark .mask {
+  display: inline-block;
+  overflow: hidden;
+  padding: 0 0.04em 0.08em;
+}
+
+.intro-mark .mask > span {
+  display: inline-block;
+}
+
+.intro-name {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+/* ---------- Cursor dot (fine pointers only; rendered from JS) ---------- */
+.cursor-dot {
+  position: fixed;
+  top: -4px;
+  left: -4px;
+  z-index: 90;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  pointer-events: none;
   opacity: 0;
-  transform: translateY(18px);
-  transition: opacity 0.7s ease, transform 0.7s ease;
-}
-
-.reveal.is-visible {
-  opacity: 1;
-  transform: none;
-}
-
-.reveal.card.is-visible:hover {
-  transform: translateY(-4px);
 }
 
 /* ---------- Responsive ---------- */
@@ -706,11 +829,12 @@ ul {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
+  .card:hover,
+  .project-card:hover {
+    translate: none;
   }
-  .reveal {
-    opacity: 1;
+  .project-card:hover .project-media img,
+  .project-card:hover .project-placeholder {
     transform: none;
   }
   *,
