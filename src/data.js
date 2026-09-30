@@ -56,7 +56,7 @@ export const about = {
   ],
   facts: [
     { label: "Experience", value: "SIH Participant 2026", detail: "Frontend Developer" },
-    { label: "Education", value: "B.Tech ISE", detail: "2024 – 2028 · DBIT" },
+    { label: "Education", value: "B.E. Information Science & Engineering", detail: "2024 – 2028 · DBIT" },
   ],
 };
 
