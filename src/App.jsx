@@ -1,39 +1,24 @@
 import { useEffect, useRef, useState } from "react";
+import { Link, matchPath, useLocation, useNavigate } from "react-router-dom";
 import {
   AnimatePresence,
   LazyMotion,
   MotionConfig,
   cubicBezier,
-  domAnimation,
+  domMax,
   m,
   useMotionValue,
   useReducedMotion,
   useSpring,
 } from "framer-motion";
 import { profile, contact, projects, about, skills, achievements, nav } from "./data.js";
+import { ArrowIcon, EASE, ProjectImage, Reveal, imageLayoutId } from "./shared.jsx";
+import ProjectPage from "./ProjectPage.jsx";
 
-const EASE = [0.22, 1, 0.36, 1];
 const easeFn = cubicBezier(...EASE);
 const NAV_OFFSET = 80; // matches scroll-padding-top in styles.css
 const INTRO_KEY = "intro-seen";
-
-// Fades children up the first time they scroll into view. `delay` is in seconds.
-// Hover lifts use the CSS `translate` property so they don't fight Framer's inline transform.
-function Reveal({ as = "div", delay = 0, children, ...rest }) {
-  const reduce = useReducedMotion();
-  const Tag = m[as];
-  return (
-    <Tag
-      initial={reduce ? false : { opacity: 0, y: 30 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.15 }}
-      transition={{ duration: 0.8, ease: EASE, delay }}
-      {...rest}
-    >
-      {children}
-    </Tag>
-  );
-}
+const HOME_TITLE = document.title;
 
 function shouldShowIntro() {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return false;
@@ -368,34 +353,10 @@ function Hero({ ready }) {
   );
 }
 
-function ProjectImage({ project }) {
-  const [failed, setFailed] = useState(false);
-  if (failed) {
-    return (
-      <div className="project-placeholder" aria-hidden="true">
-        <span>{project.name}</span>
-      </div>
-    );
-  }
-  return (
-    <img
-      src={project.image}
-      alt={`${project.name} screenshot`}
-      loading="lazy"
-      onError={() => setFailed(true)}
-    />
-  );
-}
-
-function ArrowIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M7 17 17 7M8 7h9v9" />
-    </svg>
-  );
-}
-
-function Work() {
+// `returning` is the slug whose detail page is closing: only that card's screenshot animates
+// (flying back from the detail header). Every other card snaps, so a card whose layoutId was
+// briefly borrowed by a "Next project" thumbnail never flies across the screen.
+function Work({ returning }) {
   return (
     <section id="work" className="section">
       <div className="container">
@@ -406,12 +367,26 @@ function Work() {
 
         <div className="projects">
           {projects.map((project, i) => (
-            <Reveal as="article" key={project.name} className="card project-card" delay={i * 0.1}>
-              <div className="project-media">
+            <Reveal as="article" key={project.slug} className="card project-card" delay={i * 0.1}>
+              <m.div
+                className={`project-media ${returning === project.slug ? "is-returning" : ""}`}
+                layoutId={imageLayoutId(project.slug)}
+                transition={{ layout: { duration: returning === project.slug ? 0.7 : 0, ease: EASE } }}
+                style={{ borderTopLeftRadius: 17, borderTopRightRadius: 17 }}
+              >
                 <ProjectImage project={project} />
-              </div>
+              </m.div>
               <div className="project-body">
-                <h3>{project.name}</h3>
+                <h3>
+                  {/* Stretched link: the whole card opens the detail page; the buttons sit above it */}
+                  <Link
+                    to={`/projects/${project.slug}`}
+                    state={{ depth: 1, fromHome: true }}
+                    className="card-link"
+                  >
+                    {project.name}
+                  </Link>
+                </h3>
                 <p className="project-desc">{project.description}</p>
                 <ul className="tags">
                   {project.tags.map((tag) => (
@@ -584,20 +559,118 @@ export default function App() {
     };
   }, [showIntro]);
 
+  const { project, next, returning, animateImage, nextState, close } = useProjectRoute();
+  const reduce = useReducedMotion();
+  const homeRef = useRef(null);
+
+  // While a project is open: lock the home page's scroll (it keeps its position underneath),
+  // hide it from keyboard and screen readers, and let Escape close the project
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle("lock-scroll", Boolean(project));
+    if (homeRef.current) homeRef.current.inert = Boolean(project);
+    document.title = project ? `${project.name} — ${profile.name}` : HOME_TITLE;
+    if (!project) return;
+    const onKey = (e) => e.key === "Escape" && close();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [project, close]);
+
   return (
-    <LazyMotion features={domAnimation} strict>
+    <LazyMotion features={domMax} strict>
       <MotionConfig reducedMotion="user">
         <Intro show={showIntro} />
         <CursorDot />
-        <Navbar ready={ready} />
-        <main>
-          <Hero ready={ready} />
-          <Work />
-          <About />
-          <Contact />
-        </main>
-        <Footer />
+        <div ref={homeRef}>
+          <Navbar ready={ready} />
+          <main>
+            <Hero ready={ready} />
+            <Work returning={returning} />
+            <About />
+            <Contact />
+          </main>
+          <Footer />
+        </div>
+
+        <AnimatePresence>
+          {project && (
+            <m.div
+              key="backdrop"
+              className="detail-backdrop"
+              initial={reduce ? false : { opacity: 0 }}
+              animate={{ opacity: 1, transition: { duration: 0.35, ease: EASE } }}
+              exit={{ opacity: 0, transition: { duration: reduce ? 0 : 0.4, ease: EASE, delay: reduce ? 0 : 0.1 } }}
+            />
+          )}
+        </AnimatePresence>
+        <AnimatePresence>
+          {project && (
+            <ProjectPage
+              key={project.slug}
+              project={project}
+              next={next}
+              nextState={nextState}
+              animateImage={animateImage}
+              onClose={close}
+            />
+          )}
+        </AnimatePresence>
       </MotionConfig>
     </LazyMotion>
   );
+}
+
+// Reads /projects/:slug from the URL and works out how the detail page should open and close.
+// History state carries `depth` (how many project pages deep we are) and `fromHome`.
+function useProjectRoute() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const slug = matchPath("/projects/:slug", location.pathname)?.params.slug;
+  const index = projects.findIndex((p) => p.slug === slug);
+  const project = index >= 0 ? projects[index] : null;
+  const next = project ? projects[(index + 1) % projects.length] : null;
+  const state = location.state || {};
+
+  // Remember which project just closed, during the same render as the close, so its card
+  // gets the fly-back transition. Cleared again once the animation has finished.
+  const [shown, setShown] = useState(project?.slug ?? null);
+  const [returning, setReturning] = useState(null);
+  const current = project?.slug ?? null;
+  if (current !== shown) {
+    setReturning(current === null ? shown : null);
+    setShown(current);
+  }
+  useEffect(() => {
+    if (!returning) return;
+    const timer = setTimeout(() => setReturning(null), 1000);
+    return () => clearTimeout(timer);
+  }, [returning]);
+
+  // Unknown project slug: go home
+  useEffect(() => {
+    if (slug && !project) navigate("/", { replace: true });
+  }, [slug, project, navigate]);
+
+  const closeRef = useRef();
+  closeRef.current = () => {
+    if (state.fromHome && state.depth) {
+      // Rewind to the home entry so the back button history stays clean
+      navigate(-state.depth);
+    } else {
+      // Opened directly from a link: there's no home entry behind it, so replace this one
+      navigate("/", { replace: true });
+    }
+  };
+  // Stable function identity for effects and props
+  const [close] = useState(() => () => closeRef.current());
+
+  return {
+    project,
+    next,
+    returning,
+    // Pages opened by clicking inside the site animate the image; a direct visit just fades in
+    animateImage: Boolean(state.depth),
+    nextState: { depth: (state.depth || 0) + 1, fromHome: Boolean(state.fromHome) },
+    close,
+  };
 }

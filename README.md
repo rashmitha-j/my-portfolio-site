@@ -2,7 +2,7 @@
 
 Personal portfolio built with React + Vite. Deployed on Vercel.
 
-- Edit content in `src/data.js`
+- Edit content in `src/data.js`, including each project's detail page (`/projects/<slug>`)
 - Profile photo: `public/me.jpg` (falls back to initials if missing)
 - Project screenshots: `public/jobportal.png`, `public/shopease.png`, `public/learnhub.png` (gradient placeholders show until added)
 

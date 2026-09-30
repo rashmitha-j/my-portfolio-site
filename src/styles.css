@@ -67,6 +67,11 @@ html {
   scrollbar-gutter: stable;
 }
 
+/* Set while a project page is open; the home page keeps its scroll position underneath */
+html.lock-scroll {
+  overflow: hidden;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -412,17 +417,52 @@ ul {
   gap: 28px;
 }
 
+/* No overflow: hidden on the card, so the screenshot isn't clipped while it flies
+   to and from the project page */
 .project-card {
+  position: relative;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 
 .project-media {
   aspect-ratio: 16 / 10;
   border-bottom: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 1px) calc(var(--radius) - 1px) 0 0;
   overflow: hidden;
   background: var(--bg-alt);
+}
+
+/* Lift the screenshot above the fading project page while it flies back into its card */
+.project-media.is-returning {
+  position: relative;
+  z-index: 70;
+}
+
+/* Stretched link: the title link covers the whole card; the buttons sit above it */
+.card-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: var(--radius);
+}
+
+.card-link:focus-visible {
+  outline: none;
+}
+
+.card-link:focus-visible::after {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.card-link {
+  transition: color 0.2s;
+}
+
+.project-card:hover .card-link {
+  color: var(--accent);
 }
 
 .project-media img {
@@ -516,6 +556,8 @@ ul {
 }
 
 .project-actions {
+  position: relative;
+  z-index: 2;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -700,6 +742,234 @@ ul {
   color: var(--text-muted);
 }
 
+/* ---------- Project detail page ---------- */
+.detail-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--bg);
+}
+
+/* Absolute (not fixed) at the current scroll offset, set inline from JS; see ProjectPage */
+.detail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 100vh;
+  height: 100dvh;
+  z-index: 61;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  outline: none;
+}
+
+.detail-bar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--nav-bg);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+
+.detail-bar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 68px;
+  gap: 16px;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.back-link:hover {
+  color: var(--accent);
+}
+
+.detail-inner {
+  max-width: 1000px;
+  padding-top: 40px;
+  padding-bottom: 96px;
+}
+
+.detail-media {
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
+  box-shadow: var(--shadow-hover);
+}
+
+.detail-media img,
+.next-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+
+.detail-head {
+  margin-top: 48px;
+  max-width: 760px;
+}
+
+.detail-title {
+  font-size: clamp(40px, 6vw, 68px);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.detail-summary {
+  margin-top: 18px;
+  font-size: clamp(18px, 2.2vw, 21px);
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.detail-actions {
+  margin-top: 30px;
+}
+
+.detail-section {
+  margin-top: 72px;
+}
+
+.detail-section h2 {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 18px;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 48px;
+  margin-top: 72px;
+}
+
+.detail-grid .detail-section {
+  margin-top: 0;
+}
+
+.detail-prose {
+  display: grid;
+  gap: 14px;
+  font-size: 17px;
+  color: var(--text-muted);
+}
+
+.feature-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px 36px;
+}
+
+.feature-list li {
+  display: flex;
+  gap: 12px;
+  color: var(--text-muted);
+}
+
+.feature-list svg {
+  flex-shrink: 0;
+  margin-top: 4px;
+  color: var(--accent);
+}
+
+.challenges {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.challenge {
+  padding: 26px;
+}
+
+.challenge-num {
+  display: block;
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+
+.challenge h3 {
+  font-size: 18px;
+  margin-bottom: 10px;
+}
+
+.challenge p {
+  font-size: 15px;
+  color: var(--text-muted);
+}
+
+.detail .note {
+  margin-top: 56px;
+}
+
+.next-project {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-top: 24px;
+  padding: 16px;
+}
+
+.next-project:hover {
+  border-color: var(--accent);
+}
+
+.next-media {
+  flex: 0 0 200px;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
+}
+
+.next-media .project-placeholder {
+  font-size: 16px;
+}
+
+.next-text {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.next-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.next-text strong {
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+
+.next-summary {
+  font-size: 15px;
+  color: var(--text-muted);
+}
+
 /* ---------- Intro ---------- */
 .intro {
   position: fixed;
@@ -768,6 +1038,13 @@ ul {
   .about-grid {
     grid-template-columns: 1fr;
   }
+  .detail-grid,
+  .challenges {
+    grid-template-columns: 1fr;
+  }
+  .detail-grid {
+    gap: 56px;
+  }
 }
 
 @media (max-width: 720px) {
@@ -815,6 +1092,28 @@ ul {
   }
   .sub-head {
     margin-top: 64px;
+  }
+  .detail-inner {
+    padding-top: 20px;
+    padding-bottom: 72px;
+  }
+  .detail-head {
+    margin-top: 32px;
+  }
+  .detail-section,
+  .detail-grid {
+    margin-top: 56px;
+  }
+  .feature-list {
+    grid-template-columns: 1fr;
+  }
+  .next-project {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+  .next-media {
+    flex-basis: auto;
   }
 }
 
