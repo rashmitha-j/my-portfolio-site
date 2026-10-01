@@ -249,6 +249,9 @@ function Navbar({ ready }) {
               {item.label}
             </a>
           ))}
+          <a href={profile.resume} target="_blank" rel="noopener noreferrer">
+            Resume
+          </a>
           <ThemeToggle />
         </nav>
       </div>
@@ -339,6 +342,9 @@ function Hero({ ready }) {
           <m.div className="btn-row" {...motionProps(fadeUp, 0.8)}>
             <a href="#work" className="btn btn-primary">
               View my work
+            </a>
+            <a href={profile.resume} target="_blank" rel="noopener noreferrer" className="btn btn-secondary">
+              Download resume
             </a>
             <a href="#contact" className="btn btn-secondary">
               Contact me
@@ -490,9 +496,14 @@ function Contact() {
           <p className="contact-lead">
             Open to internships, SDE roles and interesting projects. The fastest way to reach me is email.
           </p>
-          <a href={`mailto:${contact.email}`} className="btn btn-primary btn-lg">
-            {contact.email}
-          </a>
+          <div className="btn-row">
+            <a href={`mailto:${contact.email}`} className="btn btn-primary btn-lg">
+              {contact.email}
+            </a>
+            <a href={profile.resume} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-lg">
+              Download resume
+            </a>
+          </div>
         </Reveal>
 
         <div className="contact-grid">

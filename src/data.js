@@ -5,6 +5,7 @@ export const profile = {
   initials: "RJ",
   tagline: "Full-stack MERN developer building scalable web applications",
   photo: "/me.jpg",
+  resume: "/Rashmitha_J_Resume.pdf",
 };
 
 export const contact = {
@@ -103,6 +104,11 @@ export const projects = [
         title: "Secure sessions without third-party cookies",
         detail:
           "Short-lived access tokens live in memory and refresh tokens in an httpOnly cookie with rotation and reuse detection. Vercel forwards /api to Render so the cookie stays first-party, and parallel refreshes share a single request so rotation never logs a user out by mistake.",
+      },
+      {
+        title: "Free-tier cold starts that don't look broken",
+        detail:
+          "Render's free backend sleeps when idle, and requests through the Vercel proxy didn't reliably wake it. The app now pings the Render health URL directly as soon as it loads, shows skeleton cards and a small 'Loading…' toast after 8 seconds, and retries safe GET requests for up to 3 minutes. POST, PUT, PATCH and DELETE are never retried after a timeout, so a slow wake-up can't place an order twice.",
       },
     ],
   },

@@ -1143,3 +1143,8 @@ ul {
     animation-duration: 0.01ms !important;
   }
 }
+
+.contact-head .btn-row {
+  margin-top: 0;
+  justify-content: center;
+}
