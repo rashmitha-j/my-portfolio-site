@@ -3,7 +3,7 @@
 export const profile = {
   name: "Rashmitha J",
   initials: "RJ",
-  tagline: "Full-stack MERN developer building scalable web applications",
+  tagline: "Full-stack developer building AI-powered web applications",
   photo: "/me.jpg",
   resume: "/Rashmitha_J_Resume.pdf",
 };
@@ -121,8 +121,8 @@ export const projects = [
 
 export const about = {
   paragraphs: [
-    "Hello! I'm a third-year Information Science Engineering student at Don Bosco Institute of Technology, Bengaluru, with a strong background in MERN stack development and a deep understanding of DSA in C++. My problem-solving skills enable me to write efficient, optimized code for complex challenges.",
-    "I've solved 300+ questions on platforms like LeetCode and consistently participate in weekly contests to sharpen my skills further. Right now, I'm immersed in MERN stack projects, contributing to every stage of the development lifecycle — from planning to deployment.",
+    "Hello! I'm a third-year Information Science Engineering student at Don Bosco Institute of Technology, Bengaluru, with a strong background in full-stack web development and a deep understanding of DSA in C++. My problem-solving skills enable me to write efficient, optimized code for complex challenges.",
+    "I've solved 300+ questions on platforms like LeetCode and consistently participate in weekly contests to sharpen my skills further. Right now, I'm building AI applications with Python, FastAPI and Google Gemini, such as RAG systems that answer questions from your own documents with cited sources, and taking them from planning to deployment.",
   ],
   facts: [
     { label: "Experience", value: "SIH Participant 2026", detail: "Frontend Developer" },
@@ -131,9 +131,9 @@ export const about = {
 };
 
 export const skills = [
-  { group: "Frameworks", items: ["ReactJS", "Node.js", "Express.js", "Tailwind CSS"] },
-  { group: "Languages", items: ["C++", "JavaScript", "Java", "HTML/CSS", "SQL"] },
-  { group: "Databases", items: ["MongoDB", "MySQL"] },
+  { group: "Frameworks", items: ["ReactJS", "Next.js", "Node.js", "Express.js", "FastAPI", "Tailwind CSS"] },
+  { group: "Languages", items: ["Python", "C++", "JavaScript", "TypeScript", "Java", "SQL", "HTML/CSS"] },
+  { group: "AI & Databases", items: ["Google Gemini", "RAG", "pgvector", "PostgreSQL", "MongoDB", "MySQL"] },
   { group: "Others", items: ["DSA", "OOPS", "DBMS", "OS", "CN", "Git & GitHub"] },
 ];
 
